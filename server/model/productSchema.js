@@ -8,10 +8,15 @@ const productSchema = new mongoose.Schema(
       trim: true,
     },
 
+    slug: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+
     description: {
       type: String,
       required: true,
-      trim: true,
     },
 
     price: {
@@ -19,7 +24,22 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
 
-    image: {
+    discountPrice: {
+      type: Number,
+      default: 0,
+    },
+
+    brand: {
+      type: String,
+      required: true,
+    },
+
+    stock: {
+      type: Number,
+      required: true,
+    },
+
+    thumbnail: {
       type: String,
       required: true,
     },
@@ -30,9 +50,21 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
 
-    quantity: {
-      type: Number,
+    subcategory: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SubCategory",
       required: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["active", "inactive"],
+      default: "active",
+    },
+
+    featured: {
+      type: Boolean,
+      default: false,
     },
   },
   {
