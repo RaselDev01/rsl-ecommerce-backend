@@ -4,7 +4,7 @@ const productSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: true,
+      required: [true, "Product title is required"],
       trim: true,
     },
 
@@ -12,6 +12,8 @@ const productSchema = new mongoose.Schema(
       type: String,
       required: true,
       unique: true,
+      lowercase: true,
+      trim: true,
     },
 
     description: {
@@ -21,22 +23,28 @@ const productSchema = new mongoose.Schema(
 
     price: {
       type: Number,
-      required: true,
+      required: [true, "Price is required"],
+      min: [0, "Price cannot be negative"],
     },
 
     discountPrice: {
       type: Number,
       default: 0,
+      min: [0, "Discount price cannot be negative"],
     },
 
-    brand: {
-      type: String,
-      required: true,
-    },
+brand: {
+  type: String,
+  required: [true, "Brand is required"],
+  trim: true,
+  lowercase: true,
+},
 
     stock: {
       type: Number,
       required: true,
+      min: [0, "Stock cannot be negative"],
+      default: 0,
     },
 
     thumbnail: {
@@ -58,7 +66,8 @@ const productSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["active", "inactive"],
+      enum: ["active", "inactive", ], 
+      // enum e "draft" add hobe
       default: "active",
     },
 
@@ -66,10 +75,51 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+
+    galleryImages: [
+      {
+        type: String,
+      },
+    ],
+
+sku: {
+  type: String,
+  unique: true,
+  required: [true, "SKU is required"],
+  trim: true,
+  uppercase: true,
+},
+
+    tags: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
+
+    seoTitle: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    seoDescription: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Product creator is required"],
+    },
   },
   {
     timestamps: true,
-  },
+  }
 );
+
+productSchema.index({ title: "text", tags: "text" });
 
 module.exports = mongoose.model("Product", productSchema);

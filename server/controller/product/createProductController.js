@@ -15,9 +15,23 @@ async function createProductController(req, res) {
       category,
       subcategory,
       featured,
+      sku,
+      tags,
+      seoTitle,
+      seoDescription,
     } = req.body;
-    
-  const thumbnail = req.file ? req.file.filename : null;
+
+    const productPrice = Number(price);
+    const productDiscountPrice = Number(discountPrice);
+
+    if (productDiscountPrice > productPrice) {
+      return res.status(400).json({
+        success: false,
+        message: "Discount price cannot be greater than price",
+      });
+    }
+
+    const thumbnail = req.file ? req.file.filename : null;
 
     if (
       !title ||
@@ -26,7 +40,8 @@ async function createProductController(req, res) {
       !brand ||
       !stock ||
       !category ||
-      !subcategory
+      !subcategory ||
+      !sku
     ) {
       return res.status(400).json({
         success: false,
@@ -37,22 +52,32 @@ async function createProductController(req, res) {
     const existingCategory = await Category.findById(category);
 
     if (!existingCategory) {
-        return res.status(404).json({
-            success: false,
-            message: "Category not found",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Category not found",
+      });
     }
 
     const existingSubCategory = await SubCategory.findById(subcategory);
 
     if (!existingSubCategory) {
-        return res.status(404).json({
-            success: false,
-            message: "Subcategory not found",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Subcategory not found",
+      });
+    }
+
+    const existingSku = await Product.findOne({ sku });
+
+    if (existingSku) {
+      return res.status(400).json({
+        success: false,
+        message: "SKU already exists",
+      });
     }
 
     const slug = slugify(title, { lower: true, strict: true });
+
     const existingSlug = await Product.findOne({ slug });
 
     if (existingSlug) {
@@ -72,27 +97,31 @@ async function createProductController(req, res) {
       category,
       subcategory,
       featured,
+      sku,
+      tags,
+      seoTitle,
+      seoDescription,
       slug,
       thumbnail: `/uploads/${thumbnail}`,
+      createdBy: req.user.id,
     });
 
     const savedProduct = await newProduct.save();
-    res.status(201).json({
+
+    return res.status(201).json({
       success: true,
       message: "Product created successfully",
       product: savedProduct,
     });
-
-
   } catch (error) {
     console.error("Error creating product:", error);
-    res.status(500).json({
+
+    return res.status(500).json({
       success: false,
       message: "An error occurred while creating the product",
       error: error.message,
     });
   }
 }
-
 
 module.exports = createProductController;
