@@ -67,11 +67,16 @@ async function getProductsController(req, res) {
 
     const featured = req.query.featured;
     if (featured === "true") {
-  filter.featured = true;
-} else if (featured === "false") {
-  filter.featured = false;
-}
+      filter.featured = true;
+    } else if (featured === "false") {
+      filter.featured = false;
+    }
 
+    const status = req.query.status || "";
+    if (status) {
+    filter.status = status;
+    }
+    
 
     const totalProducts = await Product.countDocuments(filter);
 
