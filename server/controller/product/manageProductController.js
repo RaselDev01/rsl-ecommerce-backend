@@ -2,6 +2,8 @@ const slugify = require("slugify");
 const Product = require("../../model/productSchema");
 const Category = require("../../model/categorySchema");
 const SubCategory = require("../../model/subCategorySchema");
+const fs = require("fs");
+const path = require("path");
 
 async function manageProductController(req, res) {
   try {
@@ -17,6 +19,17 @@ async function manageProductController(req, res) {
         });
       }
 
+      if (product.thumbnail) {
+        const imagePath = path.join(
+          __dirname,
+          "../../",
+          product.thumbnail.replace(/^\//, ""),
+        );
+
+        if (fs.existsSync(imagePath)) {
+          fs.unlinkSync(imagePath);
+        }
+      }
       await Product.findByIdAndDelete(id);
 
       return res.status(200).json({
@@ -60,7 +73,15 @@ async function manageProductController(req, res) {
       });
     }
 
-    if (discountPrice !== undefined && Number(discountPrice) > Number(price)) {
+    const finalPrice =
+      price !== undefined ? Number(price) : Number(product.price);
+
+    const finalDiscount =
+      discountPrice !== undefined
+        ? Number(discountPrice)
+        : Number(product.discountPrice);
+
+    if (finalDiscount > finalPrice) {
       return res.status(400).json({
         success: false,
         message: "Discount price cannot be greater than price",
@@ -122,6 +143,18 @@ async function manageProductController(req, res) {
     if (seoDescription !== undefined) product.seoDescription = seoDescription;
 
     if (thumbnail) {
+      if (product.thumbnail && product.thumbnail !== thumbnail) {
+        const oldImagePath = path.join(
+          __dirname,
+          "../../",
+          product.thumbnail.replace(/^\//, ""),
+        );
+
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+
       product.thumbnail = thumbnail;
     }
 
