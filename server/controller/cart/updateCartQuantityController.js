@@ -86,9 +86,10 @@ async function updateCartQuantityController(req, res) {
       data: cart,
     });
   } catch (error) {
+    console.error("Error in updateCartQuantityController:", error);
     return res.status(500).json({
       success: false,
-      message: error.message,
+      message: "Internal server error. Failed to update cart quantity.",
     });
   }
 }
