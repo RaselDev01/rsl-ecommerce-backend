@@ -6,14 +6,20 @@ const addAddressController = require("../controller/address/addAddressController
 const getMyAddressesController = require("../controller/address/getMyAddressesController");
 const getSingleAddressController = require("../controller/address/getSingleAddressController");
 const updateAddressController = require("../controller/address/updateAddressController");
+const deleteAddressController = require("../controller/address/deleteAddressController");
+const setDefaultAddressController = require("../controller/address/setDefaultAddressController");
 
+router.use(authMiddleware);
 
+router.route("/")
+  .post(addAddressController)
+  .get(getMyAddressesController);
 
-router.post("/", authMiddleware, addAddressController);
-router.get("/", authMiddleware, getMyAddressesController);
-router.get("/:id", authMiddleware, getSingleAddressController);
-router.put("/:id", authMiddleware, updateAddressController);
+router.route("/:id")
+  .get(getSingleAddressController)
+  .put(updateAddressController)
+  .delete(deleteAddressController);
 
-
+router.patch("/:id/default", setDefaultAddressController);
 
 module.exports = router;
