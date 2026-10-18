@@ -8,7 +8,7 @@ const cartRoutes = require("./cartRoutes");
 const addressRoutes = require("./addressRoutes");
 const checkoutRoutes = require("./checkoutRoutes");
 const orderRoutes = require("./orderRoutes");
-
+const adminOrderRoutes = require("./adminOrderRoutes");
 
 
 router.use("/auth", auth);
@@ -19,7 +19,7 @@ router.use("/cart", cartRoutes);
 router.use("/address", addressRoutes);
 router.use("/checkout", checkoutRoutes);
 router.use("/orders", orderRoutes);
-
+router.use("/admin/orders", adminOrderRoutes);
 
 
 module.exports = router;
