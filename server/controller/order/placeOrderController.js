@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+
 const Cart = require("../../model/cartSchema");
 const Product = require("../../model/productSchema");
 const Address = require("../../model/addressSchema");
@@ -12,14 +13,7 @@ async function placeOrderController(req, res) {
     const userId = req.user?.id;
     const { addressId, paymentMethod, notes } = req.body;
 
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "Unauthorized access. Please log in.",
-      });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({
         success: false,
         message: "Invalid user authentication.",
@@ -87,10 +81,7 @@ async function placeOrderController(req, res) {
           throw error;
         }
 
-        if (
-          !Number.isInteger(cartItem.quantity) ||
-          cartItem.quantity < 1
-        ) {
+        if (!Number.isInteger(cartItem.quantity) || cartItem.quantity < 1) {
           const error = new Error("Invalid product quantity in your cart.");
           error.statusCode = 400;
           throw error;
@@ -149,11 +140,11 @@ async function placeOrderController(req, res) {
           throw error;
         }
 
+        const discountPrice = Number(product.discountPrice) || 0;
+
         const unitPrice =
-          Number.isFinite(product.discountPrice) &&
-          product.discountPrice > 0 &&
-          product.discountPrice < product.price
-            ? product.discountPrice
+          discountPrice > 0 && discountPrice < product.price
+            ? discountPrice
             : product.price;
 
         const itemSubtotal = Number(
@@ -167,7 +158,7 @@ async function placeOrderController(req, res) {
           thumbnail: product.thumbnail || "",
           quantity: cartItem.quantity,
           originalPrice: product.price,
-          discountPrice: product.discountPrice || 0,
+          discountPrice,
           unitPrice,
           itemSubtotal,
         });
@@ -207,6 +198,7 @@ async function placeOrderController(req, res) {
 
       const shippingFee = 0;
       const discount = 0;
+
       const total = Number(
         (subtotal + shippingFee - discount).toFixed(2)
       );
@@ -245,6 +237,7 @@ async function placeOrderController(req, res) {
       };
 
       const orders = await Order.create([orderData], { session });
+
       createdOrder = orders[0];
 
       const cartUpdate = await Cart.updateOne(
@@ -302,6 +295,9 @@ async function placeOrderController(req, res) {
     return res.status(500).json({
       success: false,
       message: "Unable to place your order. Please try again later.",
+      ...(process.env.NODE_ENV !== "production" && {
+        error: error.message,
+      }),
     });
   } finally {
     if (session) {

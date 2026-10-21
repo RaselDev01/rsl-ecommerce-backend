@@ -8,6 +8,7 @@ const getProductsController = require("../controller/product/getProductsControll
 const getSingleProductController = require("../controller/product/getSingleProductController");
 const manageProductController = require("../controller/product/manageProductController");
 
+
 router.post(
   "/",
   authMiddleware,
@@ -26,11 +27,13 @@ router.put(
   upload.single("thumbnail"),
   manageProductController,
 );
+
 router.delete(
   "/:id",
   authMiddleware,
   authorize("super_admin", "admin"),
   manageProductController,
 );
+
 
 module.exports = router;

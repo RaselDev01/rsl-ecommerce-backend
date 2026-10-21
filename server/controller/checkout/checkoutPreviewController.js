@@ -1,183 +1,14 @@
-// const Cart = require("../../model/cartSchema");
-// const Product = require("../../model/productSchema");
-// const Address = require("../../model/addressSchema");
-// const mongoose = require("mongoose");
-
-// async function checkoutPreviewController(req, res) {
-//   try {
-//     const userId = req.user?.id;
-//     const { addressId } = req.body;
-
-//     if (!userId) {
-//       return res.status(401).json({
-//         success: false,
-//         message: "Unauthorized access. Please log in.",
-//       });
-//     }
-
-//     if (!addressId || !mongoose.Types.ObjectId.isValid(addressId)) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "A valid shipping address ID is required.",
-//       });
-//     }
-
-//     const address = await Address.findOne({
-//       _id: addressId,
-//       user: userId,
-//     }).lean();
-
-//     if (!address) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "The specified shipping address was not found.",
-//       });
-//     }
-
-//     const cart = await Cart.findOne({ user: userId }).lean();
-
-//     if (!cart || !cart.items || cart.items.length === 0) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "Checkout failed. Your shopping cart is empty.",
-//       });
-//     }
-
-//     const productIds = cart.items
-//       .map((item) => item.product)
-//       .filter((id) => mongoose.Types.ObjectId.isValid(id));
-
-//     const products = await Product.find({
-//       _id: { $in: productIds },
-//       status: "active",
-//     })
-//       .select("title slug price discountPrice thumbnail stock status")
-//       .lean();
-
-//     const productMap = new Map(
-//       products.map((product) => [product._id.toString(), product])
-//     );
-
-//     const localizedItems = [];
-//     let subtotal = 0;
-
-//     for (const cartItem of cart.items) {
-//       if (!cartItem.product) continue;
-
-//       const targetProduct = productMap.get(cartItem.product.toString());
-
-//       if (!targetProduct) {
-//         return res.status(400).json({
-//           success: false,
-//           message: "One or more items in your cart are no longer available.",
-//           productId: cartItem.product,
-//         });
-//       }
-
-//       if (!Number.isInteger(cartItem.quantity) || cartItem.quantity < 1) {
-//         return res.status(400).json({
-//           success: false,
-//           message: `Invalid quantity specified for ${targetProduct.title}.`,
-//           productId: targetProduct._id,
-//         });
-//       }
-
-//       if (targetProduct.stock <= 0 || targetProduct.stock < cartItem.quantity) {
-//         return res.status(400).json({
-//           success: false,
-//           message: `Insufficient stock available for ${targetProduct.title}.`,
-//           productId: targetProduct._id,
-//           availableStock: targetProduct.stock,
-//           requestedQuantity: cartItem.quantity,
-//         });
-//       }
-
-//       const unitPrice =
-//         targetProduct.discountPrice > 0 && targetProduct.discountPrice < targetProduct.price
-//           ? targetProduct.discountPrice
-//           : targetProduct.price;
-
-//       const itemSubtotal = unitPrice * cartItem.quantity;
-//       subtotal += itemSubtotal;
-
-//       localizedItems.push({
-//         product: targetProduct._id,
-//         title: targetProduct.title,
-//         slug: targetProduct.slug,
-//         thumbnail: targetProduct.thumbnail,
-//         quantity: cartItem.quantity,
-//         originalPrice: targetProduct.price,
-//         discountPrice: targetProduct.discountPrice,
-//         unitPrice,
-//         itemSubtotal,
-//       });
-//     }
-
-//     const shippingFee = 0; 
-//     const discount = 0;
-//     const total = subtotal + shippingFee - discount;
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Checkout preview generated successfully.",
-//       data: {
-//         address: {
-//           _id: address._id.toString(),
-//           fullName: address.fullName,
-//           phone: address.phone,
-//           addressLine: address.addressLine,
-//           road: address.road,
-//           area: address.area,
-//           city: address.city,
-//           state: address.state,
-//           postalCode: address.postalCode,
-//           country: address.country,
-//         },
-//         items: localizedItems,
-//         summary: {
-//           itemCount: localizedItems.reduce((sum, item) => sum + item.quantity, 0),
-//           subtotal,
-//           shippingFee,
-//           discount,
-//           total,
-//           currency: "BDT",
-//         },
-//       },
-//     });
-
-//   } catch (error) {
-//     console.error("[CRITICAL ERROR] checkoutPreviewController failure:", error);
-    
-//     return res.status(500).json({
-//       success: false,
-//       message: "An internal server error occurred. Please try again later.",
-//     });
-//   }
-// }
-
-// module.exports = checkoutPreviewController;
-
-
-
-
-
-
-
+const mongoose = require("mongoose");
 const Cart = require("../../model/cartSchema");
 const Product = require("../../model/productSchema");
 const Address = require("../../model/addressSchema");
-const Order = require("../../model/orderSchema");
-const mongoose = require("mongoose");
 
 async function checkoutPreviewController(req, res) {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
     const userId = req.user?.id;
     const { addressId, paymentMethod, notes } = req.body;
 
-    if (!userId) {
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized access. Please log in.",
@@ -191,10 +22,17 @@ async function checkoutPreviewController(req, res) {
       });
     }
 
-    if (!paymentMethod || !["cod", "online"].includes(paymentMethod)) {
+    if (!["cod", "online"].includes(paymentMethod)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or missing payment method.",
+        message: "Payment method must be cod or online.",
+      });
+    }
+
+    if (notes !== undefined && typeof notes !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "Notes must be a string.",
       });
     }
 
@@ -206,150 +44,164 @@ async function checkoutPreviewController(req, res) {
     if (!address) {
       return res.status(404).json({
         success: false,
-        message: "The specified shipping address was not found.",
+        message: "Shipping address not found.",
       });
     }
 
-    const cart = await Cart.findOne({ user: userId }).session(session).lean();
+    const cart = await Cart.findOne({
+      user: userId,
+    }).lean();
 
-    if (!cart || !cart.items || cart.items.length === 0) {
+    if (!cart || !Array.isArray(cart.items) || cart.items.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Checkout failed. Your shopping cart is empty.",
+        message: "Your shopping cart is empty.",
       });
     }
 
-    const productIds = cart.items
-      .map((item) => item.product)
-      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+    for (const item of cart.items) {
+      if (
+        !item.product ||
+        !mongoose.Types.ObjectId.isValid(item.product)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid product found in your cart.",
+        });
+      }
+
+      if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid product quantity in your cart.",
+          productId: item.product,
+        });
+      }
+    }
+
+    const productIds = cart.items.map((item) => item.product);
 
     const products = await Product.find({
       _id: { $in: productIds },
       status: "active",
-    }).session(session);
+    })
+      .select("title slug price discountPrice thumbnail stock status")
+      .lean();
 
     const productMap = new Map(
-      products.map((product) => [product._id.toString(), product])
+      products.map((product) => [
+        product._id.toString(),
+        product,
+      ])
     );
 
-    const localizedItems = [];
+    const items = [];
     let subtotal = 0;
+    let itemCount = 0;
 
     for (const cartItem of cart.items) {
-      if (!cartItem.product) continue;
+      const product = productMap.get(cartItem.product.toString());
 
-      const targetProduct = productMap.get(cartItem.product.toString());
-
-      if (!targetProduct) {
-        await session.abortTransaction();
+      if (!product) {
         return res.status(400).json({
           success: false,
-          message: "One or more items in your cart are no longer available.",
+          message: "One or more products in your cart are unavailable.",
           productId: cartItem.product,
         });
       }
 
-      if (!Number.isInteger(cartItem.quantity) || cartItem.quantity < 1) {
-        await session.abortTransaction();
+      if (
+        !Number.isFinite(product.price) ||
+        product.price < 0 ||
+        !Number.isFinite(product.stock) ||
+        product.stock < 0
+      ) {
         return res.status(400).json({
           success: false,
-          message: `Invalid quantity specified for ${targetProduct.title}.`,
-          productId: targetProduct._id,
+          message: `Invalid price or stock data for ${product.title}.`,
         });
       }
 
-      if (targetProduct.stock <= 0 || targetProduct.stock < cartItem.quantity) {
-        await session.abortTransaction();
-        return res.status(400).json({
+      if (product.stock < cartItem.quantity) {
+        return res.status(409).json({
           success: false,
-          message: `Insufficient stock available for ${targetProduct.title}.`,
-          productId: targetProduct._id,
-          availableStock: targetProduct.stock,
+          message: `Insufficient stock available for ${product.title}.`,
+          productId: product._id,
+          availableStock: product.stock,
           requestedQuantity: cartItem.quantity,
         });
       }
 
-      targetProduct.stock -= cartItem.quantity;
-      await targetProduct.save({ session });
+      const discountPrice = Number(product.discountPrice) || 0;
 
       const unitPrice =
-        targetProduct.discountPrice > 0 && targetProduct.discountPrice < targetProduct.price
-          ? targetProduct.discountPrice
-          : targetProduct.price;
+        discountPrice > 0 && discountPrice < product.price
+          ? discountPrice
+          : product.price;
 
-      const itemSubtotal = unitPrice * cartItem.quantity;
-      subtotal += itemSubtotal;
+      const itemSubtotal = Number(
+        (unitPrice * cartItem.quantity).toFixed(2)
+      );
 
-      localizedItems.push({
-        product: targetProduct._id,
-        title: targetProduct.title,
-        slug: targetProduct.slug,
-        thumbnail: targetProduct.thumbnail,
+      items.push({
+        product: product._id,
+        title: product.title,
+        slug: product.slug,
+        thumbnail: product.thumbnail || "",
         quantity: cartItem.quantity,
-        originalPrice: targetProduct.price,
-        discountPrice: targetProduct.discountPrice,
+        originalPrice: product.price,
+        discountPrice,
         unitPrice,
         itemSubtotal,
       });
+
+      subtotal += itemSubtotal;
+      itemCount += cartItem.quantity;
     }
 
-    const shippingFee = 0; 
+    subtotal = Number(subtotal.toFixed(2));
+
+    const shippingFee = 0;
     const discount = 0;
-    const total = subtotal + shippingFee - discount;
-    const orderNumber = `ORD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const total = Number(
+      (subtotal + shippingFee - discount).toFixed(2)
+    );
 
-    const newOrder = new Order({
-      orderNumber,
-      user: userId,
-      items: localizedItems,
-      shippingAddress: {
-        fullName: address.fullName,
-        phone: address.phone,
-        email: address.email,
-        addressLine: address.addressLine,
-        road: address.road,
-        area: address.area,
-        city: address.city,
-        state: address.state,
-        postalCode: address.postalCode,
-        country: address.country,
-      },
-      itemCount: localizedItems.reduce((sum, item) => sum + item.quantity, 0),
-      subtotal,
-      shippingFee,
-      discount,
-      total,
-      currency: "BDT",
-      paymentMethod,
-      paymentStatus: "pending",
-      orderStatus: "pending",
-      notes: notes || "",
-    });
-
-    await newOrder.save({ session });
-    await Cart.findOneAndDelete({ user: userId }).session(session);
-
-    await session.commitTransaction();
-    session.endSession();
-
-    return res.status(201).json({
+    return res.status(200).json({
       success: true,
-      message: "Order placed successfully.",
-      data: newOrder,
+      message: "Checkout preview generated successfully.",
+      data: {
+        items,
+        itemCount,
+        shippingAddress: {
+          fullName: address.fullName,
+          phone: address.phone,
+          email: address.email || "",
+          addressLine: address.addressLine,
+          road: address.road || "",
+          area: address.area,
+          city: address.city,
+          state: address.state || "",
+          postalCode: address.postalCode,
+          country: address.country || "Bangladesh",
+        },
+        paymentMethod,
+        notes: notes?.trim() || "",
+        subtotal,
+        shippingFee,
+        discount,
+        total,
+        currency: "BDT",
+      },
     });
-
   } catch (error) {
-    await session.abortTransaction();
-    session.endSession();
-    console.error("[CRITICAL ERROR] checkoutController failure:", error);
-    
+    console.error("Checkout Preview Error:", error);
+
     return res.status(500).json({
       success: false,
-      message: "An internal server error occurred. Please try again later.",
+      message: "Unable to generate checkout preview. Please try again later.",
     });
   }
 }
 
 module.exports = checkoutPreviewController;
-
-
