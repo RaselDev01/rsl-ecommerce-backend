@@ -9,12 +9,13 @@ const addressRoutes = require("./addressRoutes");
 const checkoutRoutes = require("./checkoutRoutes");
 const orderRoutes = require("./orderRoutes");
 const adminOrderRoutes = require("./adminOrderRoutes");
-
+const wishlistRoutes = require("./wishlistRoutes");
 
 router.use("/auth", auth);
 router.use("/category", category);
 router.use("/subcategory", subCategory);
 router.use("/product", product);
+router.use("/wishlist", wishlistRoutes);
 router.use("/cart", cartRoutes);
 router.use("/address", addressRoutes);
 router.use("/checkout", checkoutRoutes);
