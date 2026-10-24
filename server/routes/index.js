@@ -10,6 +10,8 @@ const checkoutRoutes = require("./checkoutRoutes");
 const orderRoutes = require("./orderRoutes");
 const adminOrderRoutes = require("./adminOrderRoutes");
 const wishlistRoutes = require("./wishlistRoutes");
+const reviewRoutes = require("./reviewRoutes");
+
 
 router.use("/auth", auth);
 router.use("/category", category);
@@ -21,6 +23,7 @@ router.use("/address", addressRoutes);
 router.use("/checkout", checkoutRoutes);
 router.use("/orders", orderRoutes);
 router.use("/admin/orders", adminOrderRoutes);
+router.use("/reviews", reviewRoutes);
 
 
 module.exports = router;
