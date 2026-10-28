@@ -11,7 +11,7 @@ const orderRoutes = require("./orderRoutes");
 const adminOrderRoutes = require("./adminOrderRoutes");
 const wishlistRoutes = require("./wishlistRoutes");
 const reviewRoutes = require("./reviewRoutes");
-
+const adminReviewRoutes = require("./adminReviewRoutes");
 
 router.use("/auth", auth);
 router.use("/category", category);
@@ -24,6 +24,6 @@ router.use("/checkout", checkoutRoutes);
 router.use("/orders", orderRoutes);
 router.use("/admin/orders", adminOrderRoutes);
 router.use("/reviews", reviewRoutes);
-
+router.use("/admin/reviews", adminReviewRoutes);
 
 module.exports = router;
