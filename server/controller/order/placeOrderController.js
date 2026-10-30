@@ -6,12 +6,15 @@ const Product = require("../../model/productSchema");
 const Address = require("../../model/addressSchema");
 const Order = require("../../model/orderSchema");
 
+const validateCoupon = require("../../helpers/utils/validateCoupon");
+const redeemCoupon = require("../../helpers/utils/redeemCoupon");
+
 async function placeOrderController(req, res) {
   let session;
 
   try {
     const userId = req.user?.id;
-    const { addressId, paymentMethod, notes } = req.body;
+    const { addressId, paymentMethod, notes, couponCode } = req.body;
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({
@@ -38,6 +41,16 @@ async function placeOrderController(req, res) {
       return res.status(400).json({
         success: false,
         message: "Notes must be a string.",
+      });
+    }
+
+    if (
+      couponCode !== undefined &&
+      (typeof couponCode !== "string" || !couponCode.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid coupon code.",
       });
     }
 
@@ -169,6 +182,33 @@ async function placeOrderController(req, res) {
 
       subtotal = Number(subtotal.toFixed(2));
 
+      const shippingFee = 0;
+
+      let discount = 0;
+      let appliedCoupon = null;
+
+      if (couponCode) {
+        const couponResult = await validateCoupon({
+          couponCode,
+          subtotal,
+          userId,
+          session,
+        });
+
+        appliedCoupon = couponResult.coupon;
+        discount = couponResult.discount;
+
+        appliedCoupon = await redeemCoupon({
+          coupon: appliedCoupon,
+          userId,
+          session,
+        });
+      }
+
+      const total = Number(
+        (subtotal + shippingFee - discount).toFixed(2)
+      );
+
       for (const item of orderItems) {
         const updatedProduct = await Product.findOneAndUpdate(
           {
@@ -196,13 +236,6 @@ async function placeOrderController(req, res) {
         }
       }
 
-      const shippingFee = 0;
-      const discount = 0;
-
-      const total = Number(
-        (subtotal + shippingFee - discount).toFixed(2)
-      );
-
       const orderNumber = `ORD-${Date.now()}-${crypto
         .randomBytes(4)
         .toString("hex")
@@ -228,6 +261,8 @@ async function placeOrderController(req, res) {
         subtotal,
         shippingFee,
         discount,
+        coupon: appliedCoupon?._id || null,
+        couponCode: appliedCoupon?.code || null,
         total,
         currency: "BDT",
         paymentMethod,

@@ -2,11 +2,13 @@ const mongoose = require("mongoose");
 const Cart = require("../../model/cartSchema");
 const Product = require("../../model/productSchema");
 const Address = require("../../model/addressSchema");
+const validateCoupon = require("../../helpers/utils/validateCoupon");
+
 
 async function checkoutPreviewController(req, res) {
   try {
     const userId = req.user?.id;
-    const { addressId, paymentMethod, notes } = req.body;
+    const { addressId, paymentMethod, notes, couponCode } = req.body;
 
     if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({
@@ -33,6 +35,16 @@ async function checkoutPreviewController(req, res) {
       return res.status(400).json({
         success: false,
         message: "Notes must be a string.",
+      });
+    }
+
+    if (
+      couponCode !== undefined &&
+      (typeof couponCode !== "string" || !couponCode.trim())
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid coupon code.",
       });
     }
 
@@ -162,7 +174,27 @@ async function checkoutPreviewController(req, res) {
     subtotal = Number(subtotal.toFixed(2));
 
     const shippingFee = 0;
-    const discount = 0;
+
+    let discount = 0;
+    let appliedCoupon = null;
+
+    if (couponCode) {
+      const couponResult = await validateCoupon({
+        couponCode,
+        subtotal,
+        userId,
+      });
+
+      discount = couponResult.discount;
+
+      appliedCoupon = {
+        code: couponResult.coupon.code,
+        discountType: couponResult.coupon.discountType,
+        discountValue: couponResult.coupon.discountValue,
+        discount,
+      };
+    }
+
     const total = Number(
       (subtotal + shippingFee - discount).toFixed(2)
     );
@@ -190,6 +222,7 @@ async function checkoutPreviewController(req, res) {
         subtotal,
         shippingFee,
         discount,
+        appliedCoupon,
         total,
         currency: "BDT",
       },
@@ -197,9 +230,11 @@ async function checkoutPreviewController(req, res) {
   } catch (error) {
     console.error("Checkout Preview Error:", error);
 
-    return res.status(500).json({
+    return res.status(error.statusCode || 500).json({
       success: false,
-      message: "Unable to generate checkout preview. Please try again later.",
+      message:
+        error.message ||
+        "Unable to generate checkout preview. Please try again later.",
     });
   }
 }
