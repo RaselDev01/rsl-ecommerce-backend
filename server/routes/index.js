@@ -14,6 +14,11 @@ const reviewRoutes = require("./reviewRoutes");
 const adminReviewRoutes = require("./adminReviewRoutes");
 const adminCouponRoutes = require("./adminCouponRoutes");
 
+const adminDashboardRoutes = require("./adminDashboardRoutes");
+
+
+
+
 
 router.use("/auth", auth);
 router.use("/category", category);
@@ -28,6 +33,9 @@ router.use("/admin/orders", adminOrderRoutes);
 router.use("/reviews", reviewRoutes);
 router.use("/admin/reviews", adminReviewRoutes);
 router.use("/admin/coupons", adminCouponRoutes);
+
+router.use("/admin/dashboard", adminDashboardRoutes);
+
 
 
 
