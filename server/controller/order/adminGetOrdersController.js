@@ -7,7 +7,10 @@ function escapeRegex(text) {
 async function adminGetOrdersController(req, res) {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
-    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 10));
+    const limit = Math.min(
+      50,
+      Math.max(1, parseInt(req.query.limit, 10) || 10),
+    );
     const skip = (page - 1) * limit;
 
     const {
@@ -21,18 +24,31 @@ async function adminGetOrdersController(req, res) {
 
     const filter = {};
 
-    const ALLOWED_ORDER_STATUSES = ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
+    const ALLOWED_ORDER_STATUSES = [
+      "pending",
+      "confirmed",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled",
+    ];
     const ALLOWED_PAYMENT_STATUSES = ["pending", "paid", "failed", "refunded"];
     const ALLOWED_PAYMENT_METHODS = ["cod", "online"];
 
     if (orderStatus && !ALLOWED_ORDER_STATUSES.includes(orderStatus)) {
-      return res.status(400).json({ success: false, message: "Invalid order status." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid order status." });
     }
     if (paymentStatus && !ALLOWED_PAYMENT_STATUSES.includes(paymentStatus)) {
-      return res.status(400).json({ success: false, message: "Invalid payment status." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payment status." });
     }
     if (paymentMethod && !ALLOWED_PAYMENT_METHODS.includes(paymentMethod)) {
-      return res.status(400).json({ success: false, message: "Invalid payment method." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payment method." });
     }
 
     if (orderStatus) filter.orderStatus = orderStatus;
@@ -52,7 +68,9 @@ async function adminGetOrdersController(req, res) {
       if (startDate) {
         const start = new Date(startDate);
         if (Number.isNaN(start.getTime())) {
-          return res.status(400).json({ success: false, message: "Invalid start date format." });
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid start date format." });
         }
         createdAt.$gte = start;
       }
@@ -60,14 +78,21 @@ async function adminGetOrdersController(req, res) {
       if (endDate) {
         const end = new Date(endDate);
         if (Number.isNaN(end.getTime())) {
-          return res.status(400).json({ success: false, message: "Invalid end date format." });
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid end date format." });
         }
         end.setUTCHours(23, 59, 59, 999);
         createdAt.$lte = end;
       }
 
       if (createdAt.$gte && createdAt.$lte && createdAt.$gte > createdAt.$lte) {
-        return res.status(400).json({ success: false, message: "Start date cannot be after end date." });
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "Start date cannot be after end date.",
+          });
       }
 
       filter.createdAt = createdAt;
@@ -78,6 +103,7 @@ async function adminGetOrdersController(req, res) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
+        .populate("user", "name email")
         .lean(),
       Order.countDocuments(filter),
     ]);
@@ -101,7 +127,6 @@ async function adminGetOrdersController(req, res) {
       },
       data: orders,
     });
-
   } catch (error) {
     console.error("Admin Get Orders Error:", error);
     return res.status(500).json({
