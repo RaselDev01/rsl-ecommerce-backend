@@ -19,12 +19,16 @@ const userSchema = new Schema({
     required: true,
     trim: true
   },
-    role: {
+  profileImage: {
+    type: String,
+    default: ""
+  },
+  role: {
     type: String,
     enum: ['super_admin', 'admin', 'manager', 'staff', 'customer'],
     default: 'customer'
   }
 },
-{ timestamps: true });   
+{ timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);

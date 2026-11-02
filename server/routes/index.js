@@ -15,9 +15,7 @@ const adminReviewRoutes = require("./adminReviewRoutes");
 const adminCouponRoutes = require("./adminCouponRoutes");
 
 const adminDashboardRoutes = require("./adminDashboardRoutes");
-
-
-
+const profileRoutes = require("./profileRoutes");
 
 
 router.use("/auth", auth);
@@ -35,8 +33,7 @@ router.use("/admin/reviews", adminReviewRoutes);
 router.use("/admin/coupons", adminCouponRoutes);
 
 router.use("/admin/dashboard", adminDashboardRoutes);
-
-
+router.use("/profile", profileRoutes);
 
 
 module.exports = router;
