@@ -22,6 +22,13 @@ async function loginController(req, res) {
       });
     }
 
+    if (!existingUser.isActive) {
+      return res.status(403).json({
+        success: false,
+        message: "Your account has been deactivated",
+      });
+    }
+
     const isMatch = await bcrypt.compare(password, existingUser.password);
 
     if (!isMatch) {
