@@ -34,4 +34,16 @@ router.get(
   }
 );
 
+router.get(
+  "/super-admin",
+  authMiddleware,
+  authorize("super_admin"),
+  (req, res) => {
+    return res.status(200).json({
+      success: true,
+      message: "Welcome Super Admin!",
+    });
+  }
+);
+
 module.exports = router;
