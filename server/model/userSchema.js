@@ -32,6 +32,14 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
+    reactivationOtp: {
+      type: String,
+      default: null,
+    },
+    reactivationOtpExpires: {
+      type: Date,
+      default: null,
+    },
     role: {
       type: String,
       enum: ["super_admin", "admin", "manager", "staff", "customer"],
