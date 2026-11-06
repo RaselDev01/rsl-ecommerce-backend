@@ -8,6 +8,11 @@ const getAllUsersController = require("../controller/admin/getAllUsersController
 const getSingleUserController = require("../controller/admin/getSingleUserController");
 const createAdminUserController = require("../controller/admin/createAdminUserController");
 const updateUserRoleController = require("../controller/admin/updateUserRoleController");
+const manageUserStatusController = require("../controller/admin/manageUserStatusController");
+
+
+
+
 
 router.use(authMiddleware);
 
@@ -20,5 +25,11 @@ router.route("/:id")
 
 router.route("/:id/role")
   .patch(authorize("super_admin"), updateUserRoleController);
+
+router.route("/:id/status")
+  .patch(authorize("super_admin", "admin"), manageUserStatusController);
+
+  
+
 
 module.exports = router;
