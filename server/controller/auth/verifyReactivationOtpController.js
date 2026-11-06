@@ -1,75 +1,132 @@
+const mongoose = require("mongoose");
 const User = require("../../model/userSchema");
+const { verifyOtp } = require("../../helpers/otpHelper");
 
 async function verifyReactivationOtpController(req, res) {
   try {
     const { email, otp } = req.body;
 
-    if (!email || typeof email !== "string" || !otp) {
+    if (
+      !email ||
+      typeof email !== "string" ||
+      !otp
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Validation failed: Email and OTP are required and must be valid payloads",
+        message: "Email and OTP are required",
       });
     }
 
     const sanitizedEmail = email.toLowerCase().trim();
-    const user = await User.findOne({ email: sanitizedEmail });
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email address",
+      });
+    }
+
+    if (!/^\d{6}$/.test(String(otp))) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP must be a valid 6-digit number",
+      });
+    }
+
+    const user = await User.findOne({
+      email: sanitizedEmail,
+    }).select(
+      "+reactivationOtpHash +reactivationOtpExpires +reactivationOtpAttempts"
+    );
 
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Resource not found: User account does not exist",
+        message: "User account not found",
       });
     }
 
-    if (user.isActive) {
+    if (user.isActive && !user.deletedAt) {
       return res.status(400).json({
         success: false,
-        message: "Bad request: Account is already active",
+        message: "Account is already active",
       });
     }
 
-    if (!user.reactivationOtp || !user.reactivationOtpExpires) {
+    if (!user.reactivationOtpHash || !user.reactivationOtpExpires) {
       return res.status(400).json({
         success: false,
-        message: "Bad request: No active reactivation session found. Request a new OTP",
+        message: "No active reactivation OTP found. Please request a new OTP.",
       });
     }
 
-    if (user.reactivationOtpExpires < new Date()) {
-      user.reactivationOtp = null;
+    if (user.reactivationOtpExpires.getTime() <= Date.now()) {
+      user.reactivationOtpHash = null;
       user.reactivationOtpExpires = null;
+      user.reactivationOtpAttempts = 0;
+
       await user.save();
 
       return res.status(400).json({
         success: false,
-        message: "Validation failed: OTP has expired. Please request a new code",
+        message: "OTP has expired. Please request a new OTP.",
       });
     }
 
-    if (user.reactivationOtp !== otp.toString().trim()) {
+    if (user.reactivationOtpAttempts >= 5) {
+      return res.status(429).json({
+        success: false,
+        message:
+          "Maximum OTP verification attempts exceeded. Please request a new OTP.",
+      });
+    }
+
+    const isValidOtp = verifyOtp(
+      String(otp),
+      user.reactivationOtpHash
+    );
+
+    if (!isValidOtp) {
+      user.reactivationOtpAttempts += 1;
+
+      await user.save();
+
       return res.status(400).json({
         success: false,
-        message: "Validation failed: Invalid OTP credentials",
+        message: "Invalid OTP",
+        remainingAttempts: Math.max(
+          0,
+          5 - user.reactivationOtpAttempts
+        ),
       });
     }
 
     user.isActive = true;
     user.deletedAt = null;
-    user.reactivationOtp = null;
+
+    user.reactivationOtpHash = null;
     user.reactivationOtpExpires = null;
+    user.reactivationOtpAttempts = 0;
 
     await user.save();
 
     return res.status(200).json({
       success: true,
-      message: "Account reactivated successfully. Access granted for login authentication",
+      message: "Account reactivated successfully",
+      data: {
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isActive: user.isActive,
+      },
     });
   } catch (error) {
-    console.error(`[VerifyReactivationOtpController Error][${new Date().toISOString()}]:`, error);
+    console.error("Verify Reactivation OTP Error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Internal server error occurred while verifying reactivation OTP",
+      message: "Unable to verify reactivation OTP. Please try again later.",
     });
   }
 }

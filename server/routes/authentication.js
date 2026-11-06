@@ -3,13 +3,19 @@ const router = express.Router();
 
 const registerController = require("../controller/auth/registerController");
 const loginController = require("../controller/auth/loginController");
+const verifyRegistrationOtpController = require("../controller/auth/verifyRegistrationOtpController");
+const resendRegistrationOtpController = require("../controller/auth/resendRegistrationOtpController");
 const sendReactivationOtpController = require("../controller/auth/sendReactivationOtpController");
 const verifyReactivationOtpController = require("../controller/auth/verifyReactivationOtpController");
+
+
 
 const authMiddleware = require("../middleware/authMiddleware");
 const authorize = require("../middleware/roleMiddleware");
 
 router.post("/register", registerController);
+router.post("/verify-registration-otp", verifyRegistrationOtpController);
+router.post("/resend-registration-otp", resendRegistrationOtpController);
 router.post("/login", loginController);
 
 router.post("/reactivation/send-otp", sendReactivationOtpController);
@@ -31,7 +37,7 @@ router.get(
       success: true,
       message: "Welcome Admin!",
     });
-  }
+  },
 );
 
 router.get(
@@ -43,7 +49,7 @@ router.get(
       success: true,
       message: "Welcome Super Admin!",
     });
-  }
+  },
 );
 
 module.exports = router;
