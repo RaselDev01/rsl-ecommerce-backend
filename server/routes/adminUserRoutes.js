@@ -9,7 +9,7 @@ const getSingleUserController = require("../controller/admin/getSingleUserContro
 const createAdminUserController = require("../controller/admin/createAdminUserController");
 const updateUserRoleController = require("../controller/admin/updateUserRoleController");
 const manageUserStatusController = require("../controller/admin/manageUserStatusController");
-
+const deleteUserController = require("../controller/admin/deleteUserController");
 
 
 
@@ -21,7 +21,8 @@ router.route("/")
   .post(authorize("super_admin", "admin"), createAdminUserController);
 
 router.route("/:id")
-  .get(authorize("super_admin", "admin"), getSingleUserController);
+  .get(authorize("super_admin", "admin"), getSingleUserController)
+  .delete(authorize("super_admin", "admin"), deleteUserController);
 
 router.route("/:id/role")
   .patch(authorize("super_admin"), updateUserRoleController);
@@ -29,7 +30,9 @@ router.route("/:id/role")
 router.route("/:id/status")
   .patch(authorize("super_admin", "admin"), manageUserStatusController);
 
-  
+
+
+
 
 
 module.exports = router;
