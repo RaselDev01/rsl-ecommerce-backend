@@ -92,7 +92,36 @@ const userSchema = new Schema(
       default: 0,
       select: false,
     },
-
+    passwordResetOtpHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordResetOtpExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    passwordResetOtpAttempts: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
+    passwordResetOtpLastSentAt: {
+      type: Date,
+      default: null,
+      select: false,
+    },
+    passwordResetTokenHash: {
+      type: String,
+      default: null,
+      select: false,
+    },
+    passwordResetTokenExpires: {
+      type: Date,
+      default: null,
+      select: false,
+    },
     isActive: {
       type: Boolean,
       default: true,
@@ -102,7 +131,7 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
-    
+
     role: {
       type: String,
       enum: ["super_admin", "admin", "manager", "staff", "customer"],
@@ -111,7 +140,7 @@ const userSchema = new Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 userSchema.index(
@@ -121,7 +150,7 @@ userSchema.index(
     partialFilterExpression: {
       email: { $type: "string" },
     },
-  }
+  },
 );
 
 userSchema.index(
@@ -131,7 +160,7 @@ userSchema.index(
     partialFilterExpression: {
       phone: { $type: "string" },
     },
-  }
+  },
 );
 
 module.exports = mongoose.model("User", userSchema);

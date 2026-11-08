@@ -8,7 +8,9 @@ const resendRegistrationOtpController = require("../controller/auth/resendRegist
 const sendReactivationOtpController = require("../controller/auth/sendReactivationOtpController");
 const verifyReactivationOtpController = require("../controller/auth/verifyReactivationOtpController");
 
-
+const forgotPasswordController = require("../controller/auth/forgotPasswordController");
+const verifyPasswordResetOtpController = require("../controller/auth/verifyPasswordResetOtpController");
+const resetPasswordController = require("../controller/auth/resetPasswordController");
 
 const authMiddleware = require("../middleware/authMiddleware");
 const authorize = require("../middleware/roleMiddleware");
@@ -16,10 +18,15 @@ const authorize = require("../middleware/roleMiddleware");
 router.post("/register", registerController);
 router.post("/verify-registration-otp", verifyRegistrationOtpController);
 router.post("/resend-registration-otp", resendRegistrationOtpController);
+
 router.post("/login", loginController);
 
 router.post("/reactivation/send-otp", sendReactivationOtpController);
 router.post("/reactivation/verify-otp", verifyReactivationOtpController);
+
+router.post("/forgot-password", forgotPasswordController);
+router.post("/verify-reset-otp", verifyPasswordResetOtpController);
+router.post("/reset-password", resetPasswordController);
 
 router.get("/profile", authMiddleware, (req, res) => {
   return res.status(200).json({
@@ -37,7 +44,7 @@ router.get(
       success: true,
       message: "Welcome Admin!",
     });
-  },
+  }
 );
 
 router.get(
@@ -49,7 +56,7 @@ router.get(
       success: true,
       message: "Welcome Super Admin!",
     });
-  },
+  }
 );
 
 module.exports = router;
