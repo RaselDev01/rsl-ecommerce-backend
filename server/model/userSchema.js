@@ -131,7 +131,11 @@ const userSchema = new Schema(
       type: Date,
       default: null,
     },
-
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
     role: {
       type: String,
       enum: ["super_admin", "admin", "manager", "staff", "customer"],

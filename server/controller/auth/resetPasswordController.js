@@ -100,6 +100,9 @@ async function resetPasswordController(req, res) {
           passwordResetOtpAttempts: 0,
           passwordResetOtpLastSentAt: null,
         },
+        $inc: {
+          tokenVersion: 1,
+        },
       },
       {
         new: true,

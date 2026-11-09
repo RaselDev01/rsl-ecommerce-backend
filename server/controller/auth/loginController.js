@@ -2,15 +2,17 @@ const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const User = require("../../model/userSchema");
 
+const JWT_EXPIRY = "30d";
+
 async function loginController(req, res) {
   try {
     const { email, password } = req.body;
 
     if (
-      !email ||
       typeof email !== "string" ||
-      !password ||
-      typeof password !== "string"
+      typeof password !== "string" ||
+      !email.trim() ||
+      !password
     ) {
       return res.status(400).json({
         success: false,
@@ -18,11 +20,21 @@ async function loginController(req, res) {
       });
     }
 
-    const sanitizedEmail = email.toLowerCase().trim();
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is not configured");
+
+      return res.status(500).json({
+        success: false,
+        message: "Authentication service is not configured properly",
+      });
+    }
+
+    const sanitizedEmail = email.trim().toLowerCase();
 
     const existingUser = await User.findOne({
       email: sanitizedEmail,
-    }).select("+password");
+      deletedAt: null,
+    }).select("+password +tokenVersion");
 
     if (!existingUser) {
       return res.status(401).json({
@@ -31,7 +43,7 @@ async function loginController(req, res) {
       });
     }
 
-    if (!existingUser.isActive || existingUser.deletedAt) {
+    if (!existingUser.isActive) {
       return res.status(403).json({
         success: false,
         message:
@@ -39,12 +51,12 @@ async function loginController(req, res) {
       });
     }
 
-    const isMatch = await bcrypt.compare(
+    const isPasswordValid = await bcrypt.compare(
       password,
       existingUser.password
     );
 
-    if (!isMatch) {
+    if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -53,6 +65,16 @@ async function loginController(req, res) {
 
     const verificationMethod =
       existingUser.preferredVerificationMethod;
+
+    if (
+      verificationMethod != null &&
+      !["email", "sms"].includes(verificationMethod)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Account verification configuration is invalid",
+      });
+    }
 
     if (
       verificationMethod === "email" &&
@@ -84,29 +106,32 @@ async function loginController(req, res) {
       });
     }
 
-    if (
-      verificationMethod != null &&
-      !["email", "sms"].includes(verificationMethod)
-    ) {
-      return res.status(403).json({
-        success: false,
-        message: "Account verification configuration is invalid",
-      });
-    }
+    const tokenVersion = Number(
+      existingUser.tokenVersion ?? 0
+    );
 
-    if (!process.env.JWT_SECRET) {
-      throw new Error("JWT_SECRET is not configured");
+    if (
+      !Number.isSafeInteger(tokenVersion) ||
+      tokenVersion < 0
+    ) {
+      console.error("Invalid tokenVersion for user:", existingUser._id);
+
+      return res.status(500).json({
+        success: false,
+        message: "Unable to authenticate account",
+      });
     }
 
     const token = jwt.sign(
       {
-        id: existingUser._id,
+        id: existingUser._id.toString(),
         email: existingUser.email,
         role: existingUser.role,
+        tokenVersion,
       },
       process.env.JWT_SECRET,
       {
-        expiresIn: "30d",
+        expiresIn: JWT_EXPIRY,
       }
     );
 
