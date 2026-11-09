@@ -2,24 +2,25 @@ const User = require("../../model/userSchema");
 const sendEmail = require("../../helpers/sendEmail");
 const { generateOtp, hashOtp } = require("../../helpers/otpHelper");
 
+const OTP_EXPIRY = 5 * 60 * 1000;
+const RESEND_COOLDOWN = 60 * 1000;
+
 async function sendReactivationOtpController(req, res) {
   try {
     const { email } = req.body;
 
-    if (!email || typeof email !== "string") {
+    if (typeof email !== "string" || !email.trim()) {
       return res.status(400).json({
         success: false,
         message: "A valid email address is required",
       });
     }
 
-    const sanitizedEmail = email.toLowerCase().trim();
+    const sanitizedEmail = email.trim().toLowerCase();
 
     const user = await User.findOne({
       email: sanitizedEmail,
-    }).select(
-      "+reactivationOtpHash +reactivationOtpExpires +reactivationOtpAttempts"
-    );
+    });
 
     if (!user) {
       return res.status(404).json({
@@ -35,16 +36,41 @@ async function sendReactivationOtpController(req, res) {
       });
     }
 
+    const now = new Date();
+    const cooldownExpiry = new Date(now.getTime() - RESEND_COOLDOWN);
+
     const otp = generateOtp();
     const otpHash = hashOtp(otp);
 
-    user.reactivationOtpHash = otpHash;
-    user.reactivationOtpExpires = new Date(
-      Date.now() + 5 * 60 * 1000
-    );
-    user.reactivationOtpAttempts = 0;
+    const reservedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        isActive: false,
+        $or: [
+          { reactivationOtpLastSentAt: null },
+          { reactivationOtpLastSentAt: { $lte: cooldownExpiry } },
+        ],
+      },
+      {
+        $set: {
+          reactivationOtpHash: otpHash,
+          reactivationOtpExpires: new Date(now.getTime() + OTP_EXPIRY),
+          reactivationOtpAttempts: 0,
+          reactivationOtpLastSentAt: now,
+        },
+      },
+      {
+        new: true,
+      }
+    ).select("_id");
 
-    await user.save();
+    if (!reservedUser) {
+      return res.status(429).json({
+        success: false,
+        message: "Please wait before requesting another OTP",
+        retryAfter: 60,
+      });
+    }
 
     try {
       const safeName = user.name.replace(/[&<>"']/g, (character) => {
@@ -74,11 +100,19 @@ async function sendReactivationOtpController(req, res) {
         `
       );
     } catch (emailError) {
-      user.reactivationOtpHash = null;
-      user.reactivationOtpExpires = null;
-      user.reactivationOtpAttempts = 0;
-
-      await user.save();
+      await User.updateOne(
+        {
+          _id: user._id,
+          reactivationOtpHash: otpHash,
+        },
+        {
+          $set: {
+            reactivationOtpHash: null,
+            reactivationOtpExpires: null,
+            reactivationOtpAttempts: 0,
+          },
+        }
+      );
 
       throw emailError;
     }
@@ -88,6 +122,7 @@ async function sendReactivationOtpController(req, res) {
       message: "Account reactivation OTP sent successfully",
       data: {
         expiresIn: 300,
+        resendCooldown: 60,
       },
     });
   } catch (error) {

@@ -2,11 +2,16 @@ const mongoose = require("mongoose");
 const User = require("../../model/userSchema");
 const { verifyOtp } = require("../../helpers/otpHelper");
 
+const MAX_OTP_ATTEMPTS = 5;
+
 async function verifyRegistrationOtpController(req, res) {
   try {
     const { userId, otp } = req.body;
 
-    if (!userId || !otp) {
+    if (
+      typeof userId !== "string" ||
+      typeof otp !== "string"
+    ) {
       return res.status(400).json({
         success: false,
         message: "User ID and OTP are required",
@@ -20,14 +25,18 @@ async function verifyRegistrationOtpController(req, res) {
       });
     }
 
-    if (!/^\d{6}$/.test(String(otp))) {
+    if (!/^\d{6}$/.test(otp)) {
       return res.status(400).json({
         success: false,
         message: "OTP must be a valid 6-digit number",
       });
     }
 
-    const user = await User.findById(userId).select(
+    const user = await User.findOne({
+      _id: userId,
+      isActive: true,
+      deletedAt: null,
+    }).select(
       "+verificationOtpHash +verificationOtpExpires +verificationOtpAttempts"
     );
 
@@ -35,13 +44,6 @@ async function verifyRegistrationOtpController(req, res) {
       return res.status(404).json({
         success: false,
         message: "User account not found",
-      });
-    }
-
-    if (!user.isActive || user.deletedAt) {
-      return res.status(403).json({
-        success: false,
-        message: "This account is inactive",
       });
     }
 
@@ -77,17 +79,29 @@ async function verifyRegistrationOtpController(req, res) {
     if (!user.verificationOtpHash || !user.verificationOtpExpires) {
       return res.status(400).json({
         success: false,
-        message: "No active verification OTP found. Please request a new OTP.",
+        message:
+          "No active verification OTP found. Please request a new OTP.",
       });
     }
 
-    if (user.verificationOtpExpires.getTime() <= Date.now()) {
-      user.verificationOtpHash = null;
-      user.verificationOtpExpires = null;
-      user.verificationOtpAttempts = 0;
-      user.verificationOtpLastSentAt = null;
+    const now = new Date();
 
-      await user.save();
+    if (user.verificationOtpExpires <= now) {
+      await User.updateOne(
+        {
+          _id: user._id,
+          verificationOtpHash: user.verificationOtpHash,
+          verificationOtpExpires: { $lte: now },
+        },
+        {
+          $set: {
+            verificationOtpHash: null,
+            verificationOtpExpires: null,
+            verificationOtpAttempts: 0,
+            verificationOtpLastSentAt: null,
+          },
+        }
+      );
 
       return res.status(400).json({
         success: false,
@@ -95,7 +109,7 @@ async function verifyRegistrationOtpController(req, res) {
       });
     }
 
-    if (user.verificationOtpAttempts >= 5) {
+    if (user.verificationOtpAttempts >= MAX_OTP_ATTEMPTS) {
       return res.status(429).json({
         success: false,
         message:
@@ -104,50 +118,99 @@ async function verifyRegistrationOtpController(req, res) {
     }
 
     const isValidOtp = verifyOtp(
-      String(otp),
+      otp,
       user.verificationOtpHash
     );
 
-    if (!isValidOtp) {
-      user.verificationOtpAttempts += 1;
+    const otpFilter = {
+      _id: user._id,
+      isActive: true,
+      deletedAt: null,
+      preferredVerificationMethod: verificationMethod,
+      verificationOtpHash: user.verificationOtpHash,
+      verificationOtpExpires: { $gt: new Date() },
+      verificationOtpAttempts: { $lt: MAX_OTP_ATTEMPTS },
+      ...(verificationMethod === "email"
+        ? { emailVerified: false }
+        : { phoneVerified: false }),
+    };
 
-      await user.save();
+    if (!isValidOtp) {
+      const updatedUser = await User.findOneAndUpdate(
+        otpFilter,
+        {
+          $inc: {
+            verificationOtpAttempts: 1,
+          },
+        },
+        {
+          new: true,
+        }
+      ).select("+verificationOtpAttempts");
+
+      if (!updatedUser) {
+        return res.status(429).json({
+          success: false,
+          message:
+            "OTP expired or maximum verification attempts exceeded. Please request a new OTP.",
+        });
+      }
 
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
         remainingAttempts: Math.max(
           0,
-          5 - user.verificationOtpAttempts
+          MAX_OTP_ATTEMPTS - updatedUser.verificationOtpAttempts
         ),
       });
     }
 
-    if (verificationMethod === "email") {
-      user.emailVerified = true;
-    } else {
-      user.phoneVerified = true;
+    const verificationUpdate =
+      verificationMethod === "email"
+        ? { emailVerified: true }
+        : { phoneVerified: true };
+
+    const verifiedUser = await User.findOneAndUpdate(
+      otpFilter,
+      {
+        $set: {
+          ...verificationUpdate,
+          verificationOtpHash: null,
+          verificationOtpExpires: null,
+          verificationOtpAttempts: 0,
+          verificationOtpLastSentAt: null,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select(
+      "_id name email phone preferredVerificationMethod emailVerified phoneVerified role"
+    );
+
+    if (!verifiedUser) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "OTP expired, already used, or verification failed. Please request a new OTP if necessary.",
+      });
     }
-
-    user.verificationOtpHash = null;
-    user.verificationOtpExpires = null;
-    user.verificationOtpAttempts = 0;
-    user.verificationOtpLastSentAt = null;
-
-    await user.save();
 
     return res.status(200).json({
       success: true,
       message: "Account verification completed successfully",
       data: {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        preferredVerificationMethod: verificationMethod,
-        emailVerified: user.emailVerified,
-        phoneVerified: user.phoneVerified,
-        role: user.role,
+        userId: verifiedUser._id,
+        name: verifiedUser.name,
+        email: verifiedUser.email,
+        phone: verifiedUser.phone,
+        preferredVerificationMethod:
+          verifiedUser.preferredVerificationMethod,
+        emailVerified: verifiedUser.emailVerified,
+        phoneVerified: verifiedUser.phoneVerified,
+        role: verifiedUser.role,
       },
     });
   } catch (error) {

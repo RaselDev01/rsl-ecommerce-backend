@@ -1,15 +1,15 @@
-const mongoose = require("mongoose");
 const User = require("../../model/userSchema");
 const { verifyOtp } = require("../../helpers/otpHelper");
+
+const MAX_OTP_ATTEMPTS = 5;
 
 async function verifyReactivationOtpController(req, res) {
   try {
     const { email, otp } = req.body;
 
     if (
-      !email ||
       typeof email !== "string" ||
-      !otp
+      typeof otp !== "string"
     ) {
       return res.status(400).json({
         success: false,
@@ -17,7 +17,7 @@ async function verifyReactivationOtpController(req, res) {
       });
     }
 
-    const sanitizedEmail = email.toLowerCase().trim();
+    const sanitizedEmail = email.trim().toLowerCase();
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sanitizedEmail)) {
       return res.status(400).json({
@@ -26,7 +26,7 @@ async function verifyReactivationOtpController(req, res) {
       });
     }
 
-    if (!/^\d{6}$/.test(String(otp))) {
+    if (!/^\d{6}$/.test(otp)) {
       return res.status(400).json({
         success: false,
         message: "OTP must be a valid 6-digit number",
@@ -35,6 +35,7 @@ async function verifyReactivationOtpController(req, res) {
 
     const user = await User.findOne({
       email: sanitizedEmail,
+      isActive: false,
     }).select(
       "+reactivationOtpHash +reactivationOtpExpires +reactivationOtpAttempts"
     );
@@ -42,30 +43,35 @@ async function verifyReactivationOtpController(req, res) {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "User account not found",
-      });
-    }
-
-    if (user.isActive && !user.deletedAt) {
-      return res.status(400).json({
-        success: false,
-        message: "Account is already active",
+        message: "Inactive user account not found",
       });
     }
 
     if (!user.reactivationOtpHash || !user.reactivationOtpExpires) {
       return res.status(400).json({
         success: false,
-        message: "No active reactivation OTP found. Please request a new OTP.",
+        message:
+          "No active reactivation OTP found. Please request a new OTP.",
       });
     }
 
-    if (user.reactivationOtpExpires.getTime() <= Date.now()) {
-      user.reactivationOtpHash = null;
-      user.reactivationOtpExpires = null;
-      user.reactivationOtpAttempts = 0;
+    const now = new Date();
 
-      await user.save();
+    if (user.reactivationOtpExpires <= now) {
+      await User.updateOne(
+        {
+          _id: user._id,
+          reactivationOtpHash: user.reactivationOtpHash,
+          reactivationOtpExpires: { $lte: now },
+        },
+        {
+          $set: {
+            reactivationOtpHash: null,
+            reactivationOtpExpires: null,
+            reactivationOtpAttempts: 0,
+          },
+        }
+      );
 
       return res.status(400).json({
         success: false,
@@ -73,7 +79,7 @@ async function verifyReactivationOtpController(req, res) {
       });
     }
 
-    if (user.reactivationOtpAttempts >= 5) {
+    if (user.reactivationOtpAttempts >= MAX_OTP_ATTEMPTS) {
       return res.status(429).json({
         success: false,
         message:
@@ -82,43 +88,87 @@ async function verifyReactivationOtpController(req, res) {
     }
 
     const isValidOtp = verifyOtp(
-      String(otp),
+      otp,
       user.reactivationOtpHash
     );
 
-    if (!isValidOtp) {
-      user.reactivationOtpAttempts += 1;
+    const otpFilter = {
+      _id: user._id,
+      isActive: false,
+      reactivationOtpHash: user.reactivationOtpHash,
+      reactivationOtpExpires: { $gt: new Date() },
+      reactivationOtpAttempts: { $lt: MAX_OTP_ATTEMPTS },
+    };
 
-      await user.save();
+    if (!isValidOtp) {
+      const updatedUser = await User.findOneAndUpdate(
+        otpFilter,
+        {
+          $inc: {
+            reactivationOtpAttempts: 1,
+          },
+        },
+        {
+          new: true,
+        }
+      ).select("+reactivationOtpAttempts");
+
+      if (!updatedUser) {
+        return res.status(429).json({
+          success: false,
+          message:
+            "OTP expired or maximum verification attempts exceeded. Please request a new OTP.",
+        });
+      }
 
       return res.status(400).json({
         success: false,
         message: "Invalid OTP",
         remainingAttempts: Math.max(
           0,
-          5 - user.reactivationOtpAttempts
+          MAX_OTP_ATTEMPTS - updatedUser.reactivationOtpAttempts
         ),
       });
     }
 
-    user.isActive = true;
-    user.deletedAt = null;
+    const reactivatedUser = await User.findOneAndUpdate(
+      otpFilter,
+      {
+        $set: {
+          isActive: true,
+          deletedAt: null,
+          reactivationOtpHash: null,
+          reactivationOtpExpires: null,
+          reactivationOtpAttempts: 0,
+          reactivationOtpLastSentAt: null,
+        },
+        $inc: {
+          tokenVersion: 1,
+        },
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    ).select("_id name email role isActive");
 
-    user.reactivationOtpHash = null;
-    user.reactivationOtpExpires = null;
-    user.reactivationOtpAttempts = 0;
-
-    await user.save();
+    if (!reactivatedUser) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "OTP expired, already used, or reactivation failed.",
+      });
+    }
 
     return res.status(200).json({
       success: true,
       message: "Account reactivated successfully",
       data: {
-        userId: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        isActive: user.isActive,
+        userId: reactivatedUser._id,
+        name: reactivatedUser.name,
+        email: reactivatedUser.email,
+        role: reactivatedUser.role,
+        isActive: reactivatedUser.isActive,
       },
     });
   } catch (error) {
