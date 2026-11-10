@@ -2,6 +2,8 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middleware/authMiddleware");
+const authorize = require("../middleware/roleMiddleware");
+
 const addAddressController = require("../controller/address/addAddressController");
 const getMyAddressesController = require("../controller/address/getMyAddressesController");
 const getSingleAddressController = require("../controller/address/getSingleAddressController");
@@ -9,7 +11,7 @@ const updateAddressController = require("../controller/address/updateAddressCont
 const deleteAddressController = require("../controller/address/deleteAddressController");
 const setDefaultAddressController = require("../controller/address/setDefaultAddressController");
 
-router.use(authMiddleware);
+router.use(authMiddleware, authorize("customer"));
 
 router.route("/")
   .post(addAddressController)
