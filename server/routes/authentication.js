@@ -15,18 +15,60 @@ const resetPasswordController = require("../controller/auth/resetPasswordControl
 const authMiddleware = require("../middleware/authMiddleware");
 const authorize = require("../middleware/roleMiddleware");
 
-router.post("/register", registerController);
-router.post("/verify-registration-otp", verifyRegistrationOtpController);
-router.post("/resend-registration-otp", resendRegistrationOtpController);
+const {
+  registrationLimiter,
+  loginLimiter,
+  otpVerificationLimiter,
+  otpResendLimiter,
+  forgotPasswordLimiter,
+  passwordResetLimiter,
+} = require("../middleware/rateLimiters");
 
-router.post("/login", loginController);
+router.post("/register", registrationLimiter, registerController);
 
-router.post("/reactivation/send-otp", sendReactivationOtpController);
-router.post("/reactivation/verify-otp", verifyReactivationOtpController);
+router.post(
+  "/verify-registration-otp",
+  otpVerificationLimiter,
+  verifyRegistrationOtpController
+);
 
-router.post("/forgot-password", forgotPasswordController);
-router.post("/verify-reset-otp", verifyPasswordResetOtpController);
-router.post("/reset-password", resetPasswordController);
+router.post(
+  "/resend-registration-otp",
+  otpResendLimiter,
+  resendRegistrationOtpController
+);
+
+router.post("/login", loginLimiter, loginController);
+
+router.post(
+  "/reactivation/send-otp",
+  otpResendLimiter,
+  sendReactivationOtpController
+);
+
+router.post(
+  "/reactivation/verify-otp",
+  otpVerificationLimiter,
+  verifyReactivationOtpController
+);
+
+router.post(
+  "/forgot-password",
+  forgotPasswordLimiter,
+  forgotPasswordController
+);
+
+router.post(
+  "/verify-reset-otp",
+  otpVerificationLimiter,
+  verifyPasswordResetOtpController
+);
+
+router.post(
+  "/reset-password",
+  passwordResetLimiter,
+  resetPasswordController
+);
 
 router.get("/profile", authMiddleware, (req, res) => {
   return res.status(200).json({

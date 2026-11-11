@@ -11,28 +11,18 @@ const updateUserRoleController = require("../controller/admin/updateUserRoleCont
 const manageUserStatusController = require("../controller/admin/manageUserStatusController");
 const deleteUserController = require("../controller/admin/deleteUserController");
 
-
-
-
-router.use(authMiddleware);
+router.use(authMiddleware, authorize("admin", "super_admin"));
 
 router.route("/")
-  .get(authorize("super_admin", "admin"), getAllUsersController)
-  .post(authorize("super_admin", "admin"), createAdminUserController);
+  .get(getAllUsersController)
+  .post(createAdminUserController);
 
 router.route("/:id")
-  .get(authorize("super_admin", "admin"), getSingleUserController)
-  .delete(authorize("super_admin", "admin"), deleteUserController);
+  .get(getSingleUserController)
+  .delete(deleteUserController);
 
-router.route("/:id/role")
-  .patch(authorize("super_admin"), updateUserRoleController);
+router.patch("/:id/role", authorize("super_admin"), updateUserRoleController);
 
-router.route("/:id/status")
-  .patch(authorize("super_admin", "admin"), manageUserStatusController);
-
-
-
-
-
+router.patch("/:id/status", manageUserStatusController);
 
 module.exports = router;

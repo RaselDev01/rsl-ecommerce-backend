@@ -1,17 +1,20 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const createCategoryController = require("../controller/category/createCategoryController");
+
 const authMiddleware = require("../middleware/authMiddleware");
 const authorize = require("../middleware/roleMiddleware");
-const getCategoryController = require('../controller/category/getCategoryController');
-const updateCategoryController = require('../controller/category/updateCategoryController');
-const deleteCategoryController = require('../controller/category/deleteCategoryController');
 
-router.post("/createcategory", authMiddleware, authorize('super_admin', 'admin'), createCategoryController);
+const createCategoryController = require("../controller/category/createCategoryController");
+const getCategoryController = require("../controller/category/getCategoryController");
+const updateCategoryController = require("../controller/category/updateCategoryController");
+const deleteCategoryController = require("../controller/category/deleteCategoryController");
+
 router.get("/allcategory", getCategoryController);
-router.put("/updatecategory/:id", authMiddleware, authorize('super_admin', 'admin'), updateCategoryController);
-router.delete("/deletecategory/:id",authMiddleware, authorize('super_admin', 'admin'), deleteCategoryController);
 
+router.use(authMiddleware, authorize("super_admin", "admin"));
 
+router.post("/createcategory", createCategoryController);
+router.put("/updatecategory/:id", updateCategoryController);
+router.delete("/deletecategory/:id", deleteCategoryController);
 
 module.exports = router;

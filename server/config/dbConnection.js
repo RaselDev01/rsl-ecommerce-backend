@@ -1,10 +1,20 @@
 const mongoose = require("mongoose");
 
-function dbConnection() {
-  mongoose
-    .connect(`${process.env.DB_URL}`)
-    .then(() => console.log("Connected! to the database EcommerceApi successfully"));
+async function dbConnection() {
+  try {
+    if (!process.env.DB_URL) {
+      throw new Error("DB_URL is not configured.");
+    }
+
+    await mongoose.connect(process.env.DB_URL);
+
+    console.log("MongoDB connected successfully.");
+
+    return true;
+  } catch (error) {
+    console.error("MongoDB Connection Error:", error.message);
+    throw error;
+  }
 }
 
 module.exports = dbConnection;
-

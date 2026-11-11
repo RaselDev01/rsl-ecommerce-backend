@@ -33,6 +33,12 @@ const couponSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Discount value is required."],
       min: [0.01, "Discount value must be greater than zero."],
+      validate: {
+        validator: function (value) {
+          return this.discountType !== "percentage" || value <= 100;
+        },
+        message: "Percentage discount cannot exceed 100%.",
+      },
     },
 
     minimumOrderAmount: {
@@ -123,7 +129,10 @@ const couponSchema = new mongoose.Schema(
   }
 );
 
-couponSchema.index({ isActive: 1, startDate: 1, expiryDate: 1 });
-
+couponSchema.index({
+  isActive: 1,
+  startDate: 1,
+  expiryDate: 1,
+});
 
 module.exports = mongoose.model("Coupon", couponSchema);

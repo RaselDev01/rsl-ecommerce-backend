@@ -53,6 +53,17 @@ async function cancelOrderController(req, res) {
         throw error;
       }
 
+      if (
+        order.paymentMethod === "online" &&
+        ["paid", "refunded"].includes(order.paymentStatus)
+      ) {
+        const error = new Error(
+          "Paid online orders cannot be cancelled directly. Please contact support for refund assistance."
+        );
+        error.statusCode = 400;
+        throw error;
+      }
+
       const stockChanges = new Map();
 
       for (const item of order.items) {
@@ -66,19 +77,26 @@ async function cancelOrderController(req, res) {
       }
 
       const bulkOps = [];
-      
+
       for (const [productId, quantity] of stockChanges) {
         bulkOps.push({
           updateOne: {
             filter: { _id: productId },
-            update: { $inc: { stock: quantity } }
-          }
+            update: {
+              $inc: {
+                stock: quantity,
+              },
+            },
+          },
         });
       }
 
       if (bulkOps.length > 0) {
-        const bulkResult = await Product.bulkWrite(bulkOps, { session, ordered: true });
-        
+        const bulkResult = await Product.bulkWrite(bulkOps, {
+          session,
+          ordered: true,
+        });
+
         if (bulkResult.matchedCount !== stockChanges.size) {
           const error = new Error(
             "One or more products associated with this order no longer exist."
@@ -91,7 +109,10 @@ async function cancelOrderController(req, res) {
       order.orderStatus = "cancelled";
       order.cancelledAt = new Date();
 
-      await order.save({ session, validateBeforeSave: true });
+      await order.save({
+        session,
+        validateBeforeSave: true,
+      });
 
       cancelledOrder = order;
     });

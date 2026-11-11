@@ -132,7 +132,7 @@ async function placeOrderController(req, res) {
 
         if (
           !Number.isFinite(product.price) ||
-          product.price < 0 ||
+          product.price <= 0 ||
           !Number.isFinite(product.stock) ||
           product.stock < 0
         ) {
@@ -189,14 +189,26 @@ async function placeOrderController(req, res) {
 
       if (couponCode) {
         const couponResult = await validateCoupon({
-          couponCode,
+          couponCode: couponCode.trim(),
           subtotal,
           userId,
           session,
         });
 
         appliedCoupon = couponResult.coupon;
-        discount = couponResult.discount;
+        discount = Number(couponResult.discount);
+
+        if (
+          !Number.isFinite(discount) ||
+          discount < 0 ||
+          discount > subtotal
+        ) {
+          const error = new Error("Invalid coupon discount amount.");
+          error.statusCode = 400;
+          throw error;
+        }
+
+        discount = Number(discount.toFixed(2));
 
         appliedCoupon = await redeemCoupon({
           coupon: appliedCoupon,
@@ -208,6 +220,12 @@ async function placeOrderController(req, res) {
       const total = Number(
         (subtotal + shippingFee - discount).toFixed(2)
       );
+
+      if (!Number.isFinite(total) || total < 0) {
+        const error = new Error("Invalid order total.");
+        error.statusCode = 400;
+        throw error;
+      }
 
       for (const item of orderItems) {
         const updatedProduct = await Product.findOneAndUpdate(
