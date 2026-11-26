@@ -49,7 +49,7 @@ const orderItemSchema = new mongoose.Schema(
   },
   {
     _id: false,
-  },
+  }
 );
 
 const shippingAddressSchema = new mongoose.Schema(
@@ -108,7 +108,7 @@ const shippingAddressSchema = new mongoose.Schema(
   },
   {
     _id: false,
-  },
+  }
 );
 
 const orderSchema = new mongoose.Schema(
@@ -192,9 +192,20 @@ const orderSchema = new mongoose.Schema(
       default: "pending",
     },
     paymentDetails: {
-      transactionId: { type: String, trim: true, default: null },
-      gatewayName: { type: String, trim: true, default: null },
-      paidAt: { type: Date, default: null },
+      transactionId: {
+        type: String,
+        trim: true,
+        default: null,
+      },
+      gatewayName: {
+        type: String,
+        trim: true,
+        default: null,
+      },
+      paidAt: {
+        type: Date,
+        default: null,
+      },
     },
     orderStatus: {
       type: String,
@@ -221,10 +232,14 @@ const orderSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    reservationReleasedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
-  },
+  }
 );
 
 orderSchema.index({ user: 1, createdAt: -1 });

@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
+
 const Order = require("../../model/orderSchema");
-const Product = require("../../model/productSchema");
+const releaseOrderReservation = require("../../helpers/order/releaseOrderReservation");
 
 async function cancelOrderController(req, res) {
   let session;
@@ -64,47 +65,10 @@ async function cancelOrderController(req, res) {
         throw error;
       }
 
-      const stockChanges = new Map();
-
-      for (const item of order.items) {
-        const productId = item.product.toString();
-        const currentQuantity = stockChanges.get(productId) || 0;
-
-        stockChanges.set(
-          productId,
-          currentQuantity + item.quantity
-        );
-      }
-
-      const bulkOps = [];
-
-      for (const [productId, quantity] of stockChanges) {
-        bulkOps.push({
-          updateOne: {
-            filter: { _id: productId },
-            update: {
-              $inc: {
-                stock: quantity,
-              },
-            },
-          },
-        });
-      }
-
-      if (bulkOps.length > 0) {
-        const bulkResult = await Product.bulkWrite(bulkOps, {
-          session,
-          ordered: true,
-        });
-
-        if (bulkResult.matchedCount !== stockChanges.size) {
-          const error = new Error(
-            "One or more products associated with this order no longer exist."
-          );
-          error.statusCode = 409;
-          throw error;
-        }
-      }
+      await releaseOrderReservation({
+        order,
+        session,
+      });
 
       order.orderStatus = "cancelled";
       order.cancelledAt = new Date();

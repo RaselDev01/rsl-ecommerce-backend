@@ -70,13 +70,6 @@ router.post(
   resetPasswordController
 );
 
-router.get("/profile", authMiddleware, (req, res) => {
-  return res.status(200).json({
-    success: true,
-    user: req.user,
-  });
-});
-
 router.get(
   "/admin",
   authMiddleware,

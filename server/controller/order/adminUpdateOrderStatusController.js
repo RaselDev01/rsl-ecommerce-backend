@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
+
 const Order = require("../../model/orderSchema");
-const Product = require("../../model/productSchema");
+const releaseOrderReservation = require("../../helpers/order/releaseOrderReservation");
 
 const ALLOWED_STATUSES = [
   "pending",
@@ -90,65 +91,10 @@ async function adminUpdateOrderStatusController(req, res) {
           throw error;
         }
 
-        if (!Array.isArray(order.items) || order.items.length === 0) {
-          const error = new Error(
-            "Order items are unavailable. Stock cannot be restored."
-          );
-          error.statusCode = 400;
-          throw error;
-        }
-
-        const productQuantities = new Map();
-
-        for (const item of order.items) {
-          if (
-            !item.product ||
-            !mongoose.Types.ObjectId.isValid(item.product) ||
-            !Number.isInteger(item.quantity) ||
-            item.quantity < 1
-          ) {
-            const error = new Error(
-              "Invalid order item data. Stock cannot be restored."
-            );
-            error.statusCode = 400;
-            throw error;
-          }
-
-          const productId = item.product.toString();
-
-          productQuantities.set(
-            productId,
-            (productQuantities.get(productId) || 0) + item.quantity
-          );
-        }
-
-        const bulkOperations = Array.from(
-          productQuantities.entries()
-        ).map(([productId, quantity]) => ({
-          updateOne: {
-            filter: {
-              _id: new mongoose.Types.ObjectId(productId),
-            },
-            update: {
-              $inc: {
-                stock: quantity,
-              },
-            },
-          },
-        }));
-
-        const stockResult = await Product.bulkWrite(
-          bulkOperations,
-          { session }
-        );
-
-        if (stockResult.matchedCount !== bulkOperations.length) {
-          const error = new Error(
-            "One or more products could not be found. Stock restoration failed."
-          );
-          error.statusCode = 409;
-          throw error;
-        }
+        await releaseOrderReservation({
+          order,
+          session,
+        });
       }
 
       const updateData = {
@@ -196,10 +142,9 @@ async function adminUpdateOrderStatusController(req, res) {
 
     return res.status(error.statusCode || 500).json({
       success: false,
-      message:
-        error.statusCode
-          ? error.message
-          : "An internal server error occurred while updating the order status.",
+      message: error.statusCode
+        ? error.message
+        : "An internal server error occurred while updating the order status.",
       ...(error.validNextStatuses && {
         validNextStatuses: error.validNextStatuses,
       }),
@@ -211,4 +156,4 @@ async function adminUpdateOrderStatusController(req, res) {
   }
 }
 
-module.exports = adminUpdateOrderStatusController;
+module.exports = adminUpdateOrderStatusController;  

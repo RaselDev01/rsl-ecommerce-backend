@@ -6,7 +6,10 @@ async function dbConnection() {
       throw new Error("DB_URL is not configured.");
     }
 
-    await mongoose.connect(process.env.DB_URL);
+    await mongoose.connect(process.env.DB_URL, {
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+    });
 
     console.log("MongoDB connected successfully.");
 

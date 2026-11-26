@@ -14,7 +14,7 @@ function authorize(...allowedRoles) {
       });
     }
 
-    next();
+    return next();
   };
 }
 

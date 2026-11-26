@@ -9,7 +9,11 @@ if (!fs.existsSync(uploadDirectory)) {
   fs.mkdirSync(uploadDirectory, { recursive: true });
 }
 
-const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+];
 
 const ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 
@@ -36,7 +40,7 @@ const fileFilter = (req, file, cb) => {
     return cb(new Error("Only JPG, JPEG, PNG and WEBP images are allowed."));
   }
 
-  cb(null, true);
+  return cb(null, true);
 };
 
 const upload = multer({
@@ -49,7 +53,7 @@ const upload = multer({
 });
 
 const uploadSingle = (fieldName) => (req, res, next) => {
-  upload.single(fieldName)(req, res, (err) => {
+  upload.single(fieldName)(req, res, async (err) => {
     if (err instanceof multer.MulterError) {
       const message =
         err.code === "LIMIT_FILE_SIZE"
@@ -63,8 +67,6 @@ const uploadSingle = (fieldName) => (req, res, next) => {
     }
 
     if (err) {
-      console.error("File Upload Error:", err.message);
-
       return res.status(400).json({
         success: false,
         message:
@@ -74,11 +76,50 @@ const uploadSingle = (fieldName) => (req, res, next) => {
       });
     }
 
-    next();
+    if (!req.file) {
+      return next();
+    }
+
+    try {
+      const { fileTypeFromFile } = await import("file-type");
+
+      const detectedType = await fileTypeFromFile(req.file.path);
+
+      const extension = path.extname(req.file.originalname).toLowerCase();
+
+      const extensionMatches = {
+        "image/jpeg": [".jpg", ".jpeg"],
+        "image/png": [".png"],
+        "image/webp": [".webp"],
+      };
+
+      if (
+        !detectedType ||
+        !ALLOWED_MIME_TYPES.includes(detectedType.mime) ||
+        !extensionMatches[detectedType.mime]?.includes(extension)
+      ) {
+        await fs.promises.unlink(req.file.path);
+
+        return res.status(400).json({
+          success: false,
+          message: "Invalid image file content.",
+        });
+      }
+
+      return next();
+    } catch (error) {
+      await fs.promises.unlink(req.file.path).catch(() => {});
+
+      console.error("File Validation Error:", error.message);
+
+      return res.status(400).json({
+        success: false,
+        message: "Unable to validate uploaded image.",
+      });
+    }
   });
 };
 
 module.exports = {
-  upload,
   uploadSingle,
 };

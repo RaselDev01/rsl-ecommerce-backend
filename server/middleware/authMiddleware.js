@@ -1,4 +1,5 @@
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const User = require("../model/userSchema");
 
 async function authMiddleware(req, res, next) {
@@ -11,16 +12,16 @@ async function authMiddleware(req, res, next) {
     ) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized access",
+        message: "Unauthorized access.",
       });
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error("JWT_SECRET is not configured");
+      console.error("JWT_SECRET is not configured.");
 
       return res.status(500).json({
         success: false,
-        message: "Authentication service is not configured properly",
+        message: "Authentication service is not configured properly.",
       });
     }
 
@@ -35,7 +36,9 @@ async function authMiddleware(req, res, next) {
     );
 
     if (
+      typeof verifiedToken !== "object" ||
       !verifiedToken.id ||
+      !mongoose.Types.ObjectId.isValid(verifiedToken.id) ||
       (
         verifiedToken.tokenVersion !== undefined &&
         (
@@ -46,15 +49,12 @@ async function authMiddleware(req, res, next) {
     ) {
       return res.status(401).json({
         success: false,
-        message: "Invalid or expired token",
+        message: "Invalid or expired token.",
       });
     }
 
-    const user = await User.findById(
-      verifiedToken.id
-    ).select(
-      "_id email role isActive deletedAt +tokenVersion"
-    );
+    const user = await User.findById(verifiedToken.id)
+      .select("_id email role isActive deletedAt +tokenVersion");
 
     if (
       !user ||
@@ -63,14 +63,11 @@ async function authMiddleware(req, res, next) {
     ) {
       return res.status(401).json({
         success: false,
-        message: "Account not found or deactivated",
+        message: "Account not found or deactivated.",
       });
     }
 
-    const currentTokenVersion = Number(
-      user.tokenVersion ?? 0
-    );
-
+    const currentTokenVersion = Number(user.tokenVersion ?? 0);
     const jwtTokenVersion = verifiedToken.tokenVersion ?? 0;
 
     if (
@@ -92,16 +89,20 @@ async function authMiddleware(req, res, next) {
 
     return next();
   } catch (error) {
-    if (error.name !== "JsonWebTokenError" &&
-        error.name !== "TokenExpiredError" &&
-        error.name !== "NotBeforeError" &&
-        error.name !== "CastError") {
+    if (
+      ![
+        "JsonWebTokenError",
+        "TokenExpiredError",
+        "NotBeforeError",
+        "CastError",
+      ].includes(error.name)
+    ) {
       console.error("Authentication Middleware Error:", error);
     }
 
     return res.status(401).json({
       success: false,
-      message: "Invalid or expired token",
+      message: "Invalid or expired token.",
     });
   }
 }
